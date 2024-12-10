@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nicos Game</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      background-color: black;
+      color: white;
+    }
+
+    h1 {
+      font-size: 48px;
+      color: #00ff00;
+      margin-bottom: 20px;
+      text-shadow: 2px 2px 5px #ffffff;
+    }
+
+    #startButton {
+      padding: 15px 30px;
+      font-size: 20px;
+      cursor: pointer;
+      margin: 10px;
+    }
+
+    #gameArea {
+      position: relative;
+      width: 60vh; /* Quadratisches Spielfeld basierend auf der Höhe */
+      height: 60vh;
+      border: 2px solid #333;
+      margin-top: 20px;
+      display: none;
+      background-color: #1a1a1a;
+      overflow: hidden;
+    }
+
+    .point {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      background-color: red;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      color: white;
+    }
+
+    .special-point {
+      background-color: gold;
+      font-size: 16px;
+      width: 20px;
+      height: 20px;
+      transition: top 2s linear, left 2s linear;
+    }
+
+    .pink-point {
+      background-color: pink;
+      font-size: 16px;
+      width: 20px;
+      height: 20px;
+      transition: top 2s linear, left 2s linear;
+    }
+
+    .yellow-point {
+      background-color: yellow;
+      font-size: 18px;
+      width: 40px;
+      height: 40px;
+      transition: top 2s linear, left 2s linear;
+      box-shadow: 0 0 15px 10px yellow;
+    }
+
+    .orange-point {
+      background-color: orange;
+      font-size: 18px;
+      width: 40px;
+      height: 40px;
+      transition: top 2s linear, left 2s linear;
+      box-shadow: 0 0 15px 10px orange;
+    }
+
+    #liveScore, #timerDisplay, #countdown {
+      font-size: 18px;
+      margin-top: 10px;
+      color: #ffffff;
+    }
+
+    #leaderboard {
+      margin-top: 20px;
+      text-align: center;
+      color: white;
+    }
+
+    input, button {
+      background-color: #333;
+      color: white;
+      border: none;
+      padding: 10px;
+      font-size: 18px;
+    }
+
+    input::placeholder {
+      color: #888;
+    }
+
+    /* Hintergrundschriftzug */
+    .background-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 100px;
+      color: rgba(255, 255, 255, 0.1);
+      white-space: nowrap;
+      z-index: -1;
+    }
+  </style>
+</head>
+<body>
+  <h1>Nicos Game</h1>
+  <input type="text" id="playerName" placeholder="Dein Name">
+  <button id="startButton">Start</button>
+  <div id="countdown" style="display: none;">3</div>
+  <div id="liveScore" style="display: none;">Punkte: 0</div>
+  <div id="timerDisplay" style="display: none;">Zeit: 20</div>
+  <div id="gameArea">
+    <div class="background-text">Nicos Game</div>
+  </div>
+  <div id="leaderboard">
+    <h2>Bestenliste (letzte Stunde)</h2>
+    <ol id="highScores"></ol>
+  </div>
+
+  <script>
+    const startButton = document.getElementById('startButton');
+    const gameArea = document.getElementById('gameArea');
+    const playerNameInput = document.getElementById('playerName');
+    const liveScoreDisplay = document.getElementById('liveScore');
+    const timerDisplay = document.getElementById('timerDisplay');
+    const countdownDisplay = document.getElementById('countdown');
+    const leaderboard = document.getElementById('highScores');
+    let score = 0;
+    let timer;
+    let timeRemaining = 20;
+    let highScores = JSON.parse(localStorage.getItem('highScores')) || [];
+    let points = []; // Array to keep track of points on screen
+    let orangePointChance = 0.07; // Normale Wahrscheinlichkeit für orange Punkte (7%)
+
+    function startGame() {
+      const playerName = playerNameInput.value.trim();
+      if (!playerName) {
+        alert('Bitte gib deinen Namen ein, bevor du startest!');
+        return;
+      }
+
+      score = 0;
+      timeRemaining = 20;
+      liveScoreDisplay.textContent = `Punkte: ${score}`;
+      timerDisplay.textContent = `Zeit: ${timeRemaining}`;
+      liveScoreDisplay.style.display = 'none';
+      timerDisplay.style.display = 'none';
+      gameArea.style.display = 'none';
+      countdownDisplay.style.display = 'block';
+      startButton.style.display = 'none';
+      playerNameInput.style.display = 'none';
+
+      let countdown = 3;
+      countdownDisplay.textContent = countdown;
+
+      const countdownInterval = setInterval(() => {
+        countdown--;
+        countdownDisplay.textContent = countdown;
+
+        if (countdown <= 0) {
+          clearInterval(countdownInterval);
+          countdownDisplay.style.display = 'none';
+          gameArea.style.display = 'block';
+          liveScoreDisplay.style.display = 'block';
+          timerDisplay.style.display = 'block';
+          resetGameArea();
+          startMainGame();
+        }
+      }, 1000);
+    }
+
+    function resetGameArea() {
+      gameArea.innerHTML = '<div class="background-text">Nicos Game</div>';
+      points = []; // Reset the points array
+    }
+
+    function startMainGame() {
+      orangePointChance = 0.07; // Zurücksetzen der Wahrscheinlichkeit auf 7% für die normale Runde
+      createPoint();
+      timer = setInterval(updateTimer, 1000);
+    }
+
+    function updateTimer() {
+      timeRemaining--;
+      timerDisplay.textContent = `Zeit: ${timeRemaining}`;
+      if (timeRemaining <= 0) {
+        clearInterval(timer);
+        endGame();
+      }
+    }
+
+    function createPoint() {
+      if (points.length >= 20) {
+        // Zurücksetzen, wenn mehr als 20 Punkte auf dem Spielfeld
+        timeRemaining = Math.floor(timeRemaining / 2); // Zeit halbieren
+        points = []; // Alle Punkte entfernen
+        resetGameArea(); // Spielfeld zurücksetzen
+        orangePointChance = 0.50; // Wahrscheinlichkeit für orangen Punkt auf 50% setzen
+        createPoint(); // Einen neuen Punkt hinzufügen
+        return;
+      }
+
+      const isSpecial = Math.random() < 0.05; // 5% Wahrscheinlichkeit für einen Spezialpunkt
+      const isPink = Math.random() < 0.05; // 5% Wahrscheinlichkeit für einen pinken Punkt
+      const isYellow = Math.random() < 0.04; // 4% Wahrscheinlichkeit für einen gelben Punkt
+      const isOrange = Math.random() < orangePointChance; // Dynamische Wahrscheinlichkeit für den orangen Punkt
+
+      const point = document.createElement('div');
+      point.classList.add('point');
+      if (isSpecial) {
+        point.classList.add('special-point');
+        movePointImmediately(point); // Sofortige Bewegung für den "3"-Punkt
+      }
+      if (isPink) {
+        point.classList.add('pink-point');
+      }
+      if (isYellow) {
+        point.classList.add('yellow-point');
+      }
+      if (isOrange) {
+        point.classList.add('orange-point');
+      }
+
+      point.style.top = `${Math.random() * (gameArea.clientHeight - 40)}px`;
+      point.style.left = `${Math.random() * (gameArea.clientWidth - 40)}px`;
+      point.style.backgroundColor = isPink ? 'pink' : (isYellow ? 'yellow' : (isOrange ? 'orange' : getRandomColor()));
+      point.textContent = isSpecial ? '3' : '';
+      gameArea.appendChild(point);
+      points.push(point); // Add point to the array
+
+      point.addEventListener('click', () => {
+        if (isSpecial) {
+          timeRemaining += 3;
+          timerDisplay.textContent = `Zeit: ${timeRemaining}`;
+        } else if (isPink) {
+          timeRemaining -= 2;  // 2 Sekunden von der Zeit abziehen
+          timerDisplay.textContent = `Zeit: ${timeRemaining}`;
+        } else if (isYellow) {
+          score += 2;  // Doppelte Punkte für gelben Punkt
+          liveScoreDisplay.textContent = `Punkte: ${score}`;
+        } else if (isOrange) {
+          score = 0;  // Punkte zurücksetzen bei orangenem Punkt
+          liveScoreDisplay.textContent = `Punkte: ${score}`;
+        } else {
+          score++;
+          liveScoreDisplay.textContent = `Punkte: ${score}`;
+        }
+        point.remove();
+        points = points.filter(p => p !== point); // Remove point from the array
+        createTwoNewPoints();
+      });
+    }
+
+    function movePointImmediately(point) {
+      point.style.transition = 'top 4s linear, left 4s linear'; // Langsame Bewegung
+      setInterval(() => {
+        point.style.top = `${Math.random() * (gameArea.clientHeight - 20)}px`;
+        point.style.left = `${Math.random() * (gameArea.clientWidth - 20)}px`;
+      }, 1000); // Bewegung alle 1 Sekunde
+    }
+
+    function createTwoNewPoints() {
+      createPoint();
+      createPoint();
+    }
+
+    function getRandomColor() {
+      const colors = ['red', 'blue', 'green', 'yellow', 'purple', 'orange'];
+      return colors[Math.floor(Math.random() * colors.length)];
+    }
+
+    function endGame() {
+      gameArea.style.display = 'none';
+      liveScoreDisplay.style.display = 'none';
+      timerDisplay.style.display = 'none';
+      startButton.style.display = 'block';
+      playerNameInput.style.display = 'block';
+
+      const playerName = playerNameInput.value.trim();
+      highScores.push({ name: playerName, score, time: Date.now() });
+
+      highScores = highScores
+        .filter(entry => Date.now() - entry.time < 3600000)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5);
+
+      localStorage.setItem('highScores', JSON.stringify(highScores));
+      updateLeaderboard();
+
+      alert(`Spiel vorbei! Deine Punktzahl: ${score}`);
+    }
+
+    function updateLeaderboard() {
+      leaderboard.innerHTML = highScores
+        .map(entry => `<li>${entry.name}: ${entry.score}</li>`)
+        .join('');
+    }
+
+    startButton.addEventListener('click', startGame);
+    updateLeaderboard();
+  </script>
+</body>
+</html>
